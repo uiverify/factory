@@ -1,0 +1,86 @@
+{
+  "owner": {
+    "name": "Alex",
+    "linear_mention": "@alex"
+  },
+  "repo": {
+    "path": "~/projects/your-repo",
+    "remote": "origin",
+    "base": "main",
+    "branch_prefix": "factory/",
+    "setup": "pnpm install --frozen-lockfile"
+  },
+  "linear": {
+    "team": "ABC",
+    "states": {
+      "backlog": "Backlog",
+      "ready": "Todo",
+      "in_progress": "In Progress",
+      "in_review": "In Review",
+      "done": "Done",
+      "canceled": "Canceled"
+    },
+    "needs_human_label": "Needs Info",
+    "triage_labels": {
+      "decide": "factory:decide",
+      "later": "factory:later",
+      "split": "factory:split"
+    }
+  },
+  "targets": [
+    {
+      "name": "settings-polish",
+      "project": "Settings",
+      "milestone": "Polish",
+      "scope_rule": "Bugs, copy and small UI polish on the existing settings pages only. No new settings, no new tables, no new integrations. If unsure, 'later'.",
+      "max_in_flight": 2,
+      "max_awaiting_review": 6,
+      "build_on_unmerged": true,
+      "reviewers": [],
+      "paused": false,
+      "runtime": "local",
+      "links": {
+        "UX spec": "https://linear.app/your-team/document/ux-spec"
+      }
+    }
+  ],
+  "workers": {
+    "max_concurrent": 3,
+    "model": "opus",
+    "effort": "high",
+    "claude_args": ["--dangerously-skip-permissions"],
+    "env": {},
+    "lease_minutes": 180,
+    "max_restarts": 2
+  },
+  "triage": {
+    "enabled": true,
+    "model": "sonnet",
+    "max_per_tick": 20,
+    "parallel": 4
+  },
+  "planner": {
+    "enabled": true,
+    "model": "sonnet",
+    "max_package": 5
+  },
+  "babysit": {
+    "enabled": true,
+    "heartbeat_hours": 6,
+    "command": "/factory-auto babysit"
+  },
+  "merge": {
+    "trusted_bot_reviewers": []
+  },
+  "notify": {
+    "relay_webhook": ""
+  },
+  "dashboard": {
+    "port": 7788
+  },
+  "principles_file": "principles/principles.md",
+  "tick": {
+    "state_dir": "state",
+    "lock_stale_minutes": 30
+  }
+}

@@ -1,0 +1,6 @@
+.env
+factory.json
+principles/principles.md
+state/
+.DS_Store
+node_modules/
