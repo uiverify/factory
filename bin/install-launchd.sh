@@ -1,36 +1,32 @@
 #!/bin/sh
-# Install (or reinstall) the launchd agents: the tick on a timer, the dashboard kept alive, the monitor every 30 min.
-#   sh bin/install-launchd.sh [interval_seconds]
-# Remove all three: sh bin/install-launchd.sh --remove
+# Install (or reinstall) the launchd agents: the tick on a timer and the dashboard kept alive.
+#   sh ~/.claude/factory/bin/install-launchd.sh [interval_seconds]
+# Remove both: sh ~/.claude/factory/bin/install-launchd.sh --remove
 set -e
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$HOME/.claude/factory"
+NODE="$(command -v node)"
 UID_="$(id -u)"
-TICK=ai.uiverify.factory-tick
-DASH=ai.uiverify.factory-dashboard
-MON=ai.uiverify.factory-monitor
+TICK=local.factory-tick
+DASH=local.factory-dashboard
+MON=local.factory-monitor
 mkdir -p "$HOME/Library/LaunchAgents" "$ROOT/state"
 
 if [ "${1:-}" = "--remove" ]; then
-  for L in "$TICK" "$DASH" "$MON"; do
-    launchctl bootout "gui/$UID_/$L" 2>/dev/null || true
-    rm -f "$HOME/Library/LaunchAgents/$L.plist"
-  done
+  launchctl bootout "gui/$UID_/$TICK" 2>/dev/null || true
+  launchctl bootout "gui/$UID_/$DASH" 2>/dev/null || true
+  launchctl bootout "gui/$UID_/$MON" 2>/dev/null || true
+  rm -f "$HOME/Library/LaunchAgents/$TICK.plist" "$HOME/Library/LaunchAgents/$DASH.plist" "$HOME/Library/LaunchAgents/$MON.plist"
   echo "removed $TICK, $DASH and $MON"
   exit 0
 fi
 
-NODE="$(command -v node)" || { echo "node not found on PATH"; exit 1; }
-CLAUDE="$(command -v claude)" || { echo "claude (Claude Code CLI) not found on PATH"; exit 1; }
-GH="$(command -v gh)" || { echo "gh (GitHub CLI) not found on PATH"; exit 1; }
-# The monitor runs from the target repo so gh and the repo's skills resolve.
-REPO_PATH="$("$NODE" --input-type=module -e "import { loadConfig } from '$ROOT/lib/common.mjs'; console.log(loadConfig().repo.path)")"
-
 INTERVAL="${1:-600}"
+CLAUDE_DIR="$(dirname "$(command -v claude)")"
+GH_DIR="$(dirname "$(command -v gh)")"
 PNPM_DIR="$(dirname "$(command -v pnpm 2>/dev/null || echo /usr/local/bin/pnpm)")"
-# launchd starts with a bare PATH, so bake in where node, claude, gh and the package manager live today.
-PATHS="$(dirname "$NODE"):$(dirname "$CLAUDE"):$(dirname "$GH"):$PNPM_DIR:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+PATHS="$(dirname "$NODE"):$CLAUDE_DIR:$GH_DIR:$PNPM_DIR:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
-write_plist() { # label, program-args-xml, extra-xml, working-dir
+write_plist() { # label, program-args-xml, extra-xml
   cat > "$HOME/Library/LaunchAgents/$1.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -39,18 +35,19 @@ write_plist() { # label, program-args-xml, extra-xml, working-dir
   <key>ProgramArguments</key><array>$2</array>
   $3
   <key>RunAtLoad</key><true/>
-  <key>WorkingDirectory</key><string>$4</string>
+  <key>WorkingDirectory</key><string>$ROOT</string>
   <key>StandardOutPath</key><string>$ROOT/state/$1.out.log</string>
   <key>StandardErrorPath</key><string>$ROOT/state/$1.err.log</string>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$PATHS</string><key>HOME</key><string>$HOME</string><key>FACTORY_ROOT</key><string>$ROOT</string></dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$PATHS</string><key>HOME</key><string>$HOME</string></dict>
 </dict></plist>
 EOF
 }
 
-write_plist "$TICK" "<string>$NODE</string><string>$ROOT/bin/factory-tick.mjs</string>" "<key>StartInterval</key><integer>$INTERVAL</integer>" "$ROOT"
-write_plist "$DASH" "<string>$NODE</string><string>$ROOT/bin/factory-dashboard.mjs</string>" "<key>KeepAlive</key><true/>" "$ROOT"
-# The monitor is a headless Claude run of /factory-monitor every 30 minutes; it only reads and notifies.
-write_plist "$MON" "<string>$CLAUDE</string><string>-p</string><string>--model</string><string>sonnet</string><string>--dangerously-skip-permissions</string><string>/factory-monitor headless</string>" "<key>StartInterval</key><integer>1800</integer>" "$REPO_PATH"
+write_plist "$TICK" "<string>$NODE</string><string>$ROOT/bin/factory-tick.mjs</string>" "<key>StartInterval</key><integer>$INTERVAL</integer>"
+write_plist "$DASH" "<string>$NODE</string><string>$ROOT/bin/factory-dashboard.mjs</string>" "<key>KeepAlive</key><true/>"
+# The monitor is a headless Claude run of /factory-monitor every 30 minutes; it only reads and notifies. Its skill is
+# user-scope and every gh call names its repo, so it runs from the factory root like the rest.
+write_plist "$MON" "<string>$CLAUDE_DIR/claude</string><string>-p</string><string>--model</string><string>sonnet</string><string>--dangerously-skip-permissions</string><string>/factory-monitor headless</string>" "<key>StartInterval</key><integer>1800</integer>"
 
 for L in "$TICK" "$DASH" "$MON"; do
   launchctl bootout "gui/$UID_/$L" 2>/dev/null || true
@@ -61,4 +58,4 @@ for L in "$TICK" "$DASH" "$MON"; do
   done
   launchctl print "gui/$UID_/$L" >/dev/null 2>&1 || echo "warning: $L did not load; run: launchctl bootstrap gui/$UID_ $HOME/Library/LaunchAgents/$L.plist"
 done
-echo "installed: $TICK every ${INTERVAL}s, $DASH (http://localhost:7788 unless dashboard.port says otherwise), $MON every 1800s (logs in $ROOT/state/)"
+echo "installed: $TICK every ${INTERVAL}s, $DASH at http://localhost:7788, $MON every 1800s (logs in $ROOT/state/)"

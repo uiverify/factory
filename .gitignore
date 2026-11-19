@@ -1,6 +1,9 @@
 .env
 factory.json
-principles/principles.md
+principles/*
+!principles/TEMPLATE.md
+!principles/common.md
+projects/
 state/
 .DS_Store
 node_modules/

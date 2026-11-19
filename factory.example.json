@@ -1,47 +1,43 @@
 {
   "owner": {
     "name": "Alex",
-    "linear_mention": "@alex"
+    "github": "alex"
   },
-  "repo": {
-    "path": "~/projects/your-repo",
-    "remote": "origin",
-    "base": "main",
-    "branch_prefix": "factory/",
-    "setup": "pnpm install --frozen-lockfile"
-  },
-  "linear": {
-    "team": "ABC",
-    "states": {
-      "backlog": "Backlog",
-      "ready": "Todo",
-      "in_progress": "In Progress",
-      "in_review": "In Review",
-      "done": "Done",
-      "canceled": "Canceled"
-    },
-    "needs_human_label": "Needs Info",
-    "triage_labels": {
-      "decide": "factory:decide",
-      "later": "factory:later",
-      "split": "factory:split"
+  "repos": {
+    "app": {
+      "github": "acme/app",
+      "path": "~/projects/app",
+      "remote": "origin",
+      "base": "main",
+      "branch_prefix": "factory/",
+      "setup": "pnpm install --frozen-lockfile",
+      "ship": "pr",
+      "ship_why": "every change goes through a PR into main; CI runs there and Alex merges",
+      "principles": "principles/app.md",
+      "worker_model": "opus",
+      "plugins": []
     }
   },
   "targets": [
     {
+      "name": "app-do-now",
+      "repo": "app",
+      "labels": ["priority: high"],
+      "scope_rule": "Code changes an agent can build and ship under the repo's CLAUDE.md. Not: steps only Alex can do (accounts, payments, posts), anything that reopens a recorded decision. If unsure, 'later'.",
+      "max_in_flight": 2,
+      "max_awaiting_review": 5,
+      "paused": true
+    },
+    {
       "name": "settings-polish",
-      "project": "Settings",
-      "milestone": "Polish",
+      "repo": "app",
+      "batch": 120,
       "scope_rule": "Bugs, copy and small UI polish on the existing settings pages only. No new settings, no new tables, no new integrations. If unsure, 'later'.",
       "max_in_flight": 2,
       "max_awaiting_review": 6,
-      "build_on_unmerged": true,
-      "reviewers": [],
-      "paused": false,
-      "runtime": "local",
-      "links": {
-        "UX spec": "https://linear.app/your-team/document/ux-spec"
-      }
+      "stack": true,
+      "design": "~/.claude/factory/projects/settings-polish",
+      "paused": true
     }
   ],
   "workers": {
@@ -49,6 +45,7 @@
     "model": "opus",
     "effort": "high",
     "claude_args": ["--dangerously-skip-permissions"],
+    "settings": "worker-settings.json",
     "env": {},
     "lease_minutes": 180,
     "max_restarts": 2
@@ -62,25 +59,22 @@
   "planner": {
     "enabled": true,
     "model": "sonnet",
-    "max_package": 5
+    "max_package": 4
   },
   "babysit": {
     "enabled": true,
-    "heartbeat_hours": 6,
-    "command": "/factory-auto babysit"
-  },
-  "merge": {
-    "trusted_bot_reviewers": []
+    "heartbeat_hours": 6
   },
   "notify": {
-    "relay_webhook": ""
+    "desktop": true
   },
-  "dashboard": {
-    "port": 7788
+  "usage": {
+    "ticket_alert_percent": 3
   },
-  "principles_file": "principles/principles.md",
+  "issues_doc": "issues.md",
   "tick": {
     "state_dir": "state",
-    "lock_stale_minutes": 30
+    "lock_stale_minutes": 30,
+    "sweep_agent_worktrees": false
   }
 }

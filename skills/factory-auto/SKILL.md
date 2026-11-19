@@ -1,131 +1,64 @@
 ---
 name: factory-auto
-description: /factory without the check-ins. Runs the same loop (triage, design, implement, review-loop, verify, PR, converge) but decides open questions itself from the principles file and records each choice under "Decisions taken" in the PR body. It stops only for the stop cases in the principles file. Also runs the factory's one-shot babysit pass on an open PR or stack ("/factory-auto babysit <PR>"): fix CI and review threads, compute the merge verdict, merge when the rules allow. Use for a Linear ticket that should run unattended to a merged PR, or when started by the factory tick. Triggers on "/factory-auto", "run this unattended", "don't ask me, just build it".
-argument-hint: <ticket keys | plan file | what to build> or babysit <PR> [reviewers: <login> ...]
+description: The repo's /factory loop without the check-ins. Runs the same phases (triage, design, implement, review-loop, e2e-verify when needed, the gate, then push or open a PR, per the repo's ship rule) but decides open questions itself and records each choice under "Decisions taken". It stops only for the cases in the factory principles, by parking on the GitHub issue. Started by the factory tick for one or more issues; also usable by hand for a plan file or an issue that should run unattended. Triggers on "/factory-auto", "run this unattended", "squash this issue", "don't ask me, just build it".
+argument-hint: <owner/repo#n ...>, a plan file, or what to build
 ---
 
 # /factory-auto: /factory that decides instead of asking
 
-Two modes, chosen by the first argument:
+Read the repo's own factory skill (`.claude/skills/factory/SKILL.md` in the repo you are in, else the `factory` skill installed with the factory) and run every phase as written, with the overrides below. The issue or plan you were given is the spec. This overrides any "go back and forth / ask before planning" preference for this run.
 
-- **Build** (default): ticket keys, a plan file, or a description. Run the `factory` skill's phases with the
-  overrides below.
-- **Babysit** (`babysit <PR>`): one pass over an open PR or stack, then end. See [Babysit pass](#babysit-pass).
+The owner (named in the prompt and in `factory.json` `owner.name`) starts many of these at once. Each question parks a worker until they come back to it, so asking costs far more than deciding. They would rather overrule a decision afterwards than answer it up front.
 
-The owner starts many of these at once. Each question parks a worker until the owner comes back to it, so asking
-costs far more than deciding. Owners would rather overrule a decision in review than answer it up front.
+## Read first
 
-## Build: overrides to /factory
+1. `~/.claude/factory/principles/common.md`, then the repo's principles file (`$FACTORY_PRINCIPLES`, named in the prompt).
+2. `~/.claude/factory/issues.md` (`$FACTORY_ISSUES_DOC`): how issues, labels, follow-ups, closing and parking work.
+3. The repo's `CLAUDE.md` and its decision log, when it keeps one.
+4. The target's project visuals when the prompt names a folder (`flows.html`, `wireframes.html`, `shots/`): the UI you build matches them in flow and copy, not pixels.
+5. Each issue with its comments (`gh issue view <n> -R <repo> --comments`), its batch parent and siblings, and linked PRs or commits. Their decisions win over your judgment; record any conflict as a decision.
 
-Load the `factory` skill (`skills/factory` in this repo) and run every phase as written, with these overrides.
-The plan or ticket you were given is the spec.
+## Overrides to /factory
 
-- **Phase 0 (Confirm the ask): don't ask.** Settle open questions from the principles file and write each one down for
-  the PR. Read the ticket, its comments, linked PRs, and the project documents first. Earlier decisions often sit
-  there, and they win.
-- **Phase 3 (Design):** run `/design` as usual, but its go/no-go is **not** a stop. Ask only if the converged
-  design hits one of the stop cases. Otherwise put the design summary (what, why, and the alternatives you dropped)
-  at the top of the first PR body and build.
-- **Questions the work raises** (review findings, verify observations): decide them from the principles file. If
-  two reviewers independently flag the same behavior, follow them. If you overrule one reviewer, record it as a
-  decision.
-- **Review rounds:** if each round keeps finding new edge cases in the same area, the design is wrong. Step back,
-  fix the structure underneath (usually one source of truth instead of state in two places), and say so. Don't
-  patch case by case. Once the ticket's needs are met, freeze the design.
-- **Phase "open the PR":** open the PRs with `gh pr create` (or `gh stack` when installed and the work is a
-  stack), non-draft, one PR per ticket or reviewable piece. Each PR title carries its ticket key and the body has a
-  `Fixes <KEY>` line: the tick finds a ticket's PRs that way.
+- **Clarifying questions: don't ask.** Settle open questions with the principles and write each one down.
+- **Design:** run the repo's `/design` when its triage says so, but its go/no-go is **not** a stop. Run it with `--rounds 5`: it runs until a clean round or its cap. At the cap with only minor findings open and the high-level design settled, build it and list those findings in the design and the PR body; with a blocker or major still open, never build: park with `/design`'s stop report and let the owner decide (`principles/common.md` §4). Ask only if the converged design hits a stop reason in `principles/common.md` §2. Otherwise put the design summary (what, why, the alternatives dropped) at the top of the PR body, or in a `<!-- factory-note -->` comment on the issue in a push repo, and build.
+- **Questions the work raises** (review findings, e2e observations): decide them with the principles. Two reviewers independently flagging the same behavior: follow them. Overruling one reviewer: record it as a decision.
+- **Design and review rounds:** new holes in the same area every round means the structure is wrong: change the architecture (as often as the holes call for) and say why. Never freeze to stop findings, and never soften the critics' or reviewers' instructions in later rounds (`principles/common.md` §4).
+- **Shipping:** the repo's ship rule exactly as its `CLAUDE.md` and principles file say (`$FACTORY_SHIP` is `push`, `pr` or `branch`). A `branch` target's issues land one after another as reviewed commits on one long-lived branch in a shared worktree, and the tick pushes it and opens its one PR; its prompt says how. The tick's prompt repeats the hand-off line to end with.
 
-## When to stop and ask (the only cases)
+## Ask Opus when you need to (when you are not Opus)
 
-Section 2 of the principles file lists them. In short: irreversible or outside the PR, a contradiction, a wrong
-premise, a product fork the documents don't settle, or a tool the session can't reach.
+A factory worker may run on Sonnet to save usage; design and review already run on Opus inside their skills. When you are not running on Opus, get a second opinion from an Opus subagent (Agent tool, `model: opus`) before you:
 
-When you do ask, ask once, in plain words. Say what the branch is doing, give a concrete scenario ("a user accepts
-the invite, then..."), say what the user would see under each option, and recommend one. Questions that use
-internal names, codes or thread ids without context cost a round trip.
+- make a product call the issue, the spec and the principles don't settle (what a user sees or can do);
+- change how parts of the system fit together beyond what the design or issue named (a new module, table, data flow or shared contract);
+- park, or decide not to park, on a stop reason;
+- drop a reviewer's finding, or overrule one reviewer.
 
-## Judgment
+Give it the question, the options you see, your pick and why, and the files that matter; ask for a pick and one line of reasoning. Its answer stands unless the issue or a recorded decision says otherwise. Note each consultation under Decisions taken ("Opus agreed" or "Opus picked B over my A"). Don't ask about routine choices `principles/common.md` §1 tells you to just decide.
 
-Sections 3 to 5 of the principles file are the owner's product, architecture and scope judgment. When a choice is
-open, pick the option that wins on those. When they don't settle it and users would not notice the difference,
-pick the simpler option and record it.
+## Decisions taken
 
-## PR body: "Decisions taken"
-
-Add this section to every PR, one line per choice:
+Every PR body, or every finishing commit message in a push repo, has this section, one line per choice, the ones the owner is most likely to overrule first:
 
 > **Decisions taken**
-> - The banner shows to every member, not only the creator. Alternative: creator only.
->   Why: everyone using the feature should know it stopped.
+> - The "Saved" toast stays 5 s after save. Alternative: dismiss on the next click. Why: users look away right after saving.
 
-Put the decisions the owner is most likely to overrule first. In the final report, list every PR with its
-decisions so they can be overruled in one pass.
+Mirror them as one `<!-- factory-note -->` comment on the batch parent when the issues have one, else on the first issue.
 
 ## Factory mode (unattended, started by the factory tick)
 
-You are in factory mode when the prompt says so, when `FACTORY_PRINCIPLES` is set in the environment, or when more
-than one ticket key is given. The tick (`$FACTORY_ROOT/bin/factory-tick.mjs`, by default
-`~/.claude/factory/bin/factory-tick.mjs`) started you in a fresh worktree and will call the babysit pass for you
-when the PR changes; nothing in this session needs to stay alive.
+You are in factory mode when the prompt says so or `FACTORY_PRINCIPLES` is set. The tick at `~/.claude/factory/bin/factory-tick.mjs` started you in a fresh worktree (`<repo>/.claude/worktrees/factory-<lead>`, branch `<branch_prefix><lead>`) and will keep coming back; nothing in this session needs to stay alive.
 
-- **Read first**: the principles file (`$FACTORY_PRINCIPLES`, default `~/.claude/factory/principles/principles.md`),
-  then the project's Linear documents (`list_documents` for the ticket's project: UX spec, Architecture, Defaults,
-  Decision log), then the ticket, its comments, and linked PRs. Their decisions win over your judgment; record any
-  conflict as a decision.
-- **Work package**: several keys mean one PR stack in the given order, one PR per ticket (or per reviewable piece).
-- **Never use AskUserQuestion.** The way to stop is the escalation protocol in the principles file: one Linear
-  comment starting with `<!-- factory-question -->`, the `Needs Info` label, `parked_at` in the factory state
-  comment, and the final line `FACTORY: parked on <KEY>`. The tick notifies the owner and resumes you with the
-  answer.
-- **Factory state comment**: each ticket carries a comment starting with `<!-- factory-state -->` holding a JSON
-  block the tick owns. You update only `prs` (PR numbers, as you open them) and `parked_at`; keep everything else
-  as it is.
-- **Follow-ups before the PR opens**: every follow-up or deferral the PR body lists gets a Linear ticket first
-  (`save_issue`; search with `list_issues` first, and a gap that belongs to an existing ticket goes into that
-  ticket instead). The PR body links each one. A follow-up that touches code from this package's unmerged PRs is
-  `blockedBy` this package's ticket, so the factory stacks it on the PR instead of starting it from the base branch.
-- **Hand-off**: when the PR or stack is open, run the babysit pass once (`/factory-auto babysit <top PR>` with the
-  reviewers you were given), write "Decisions taken" to each PR body and as one line per decision in the project's
-  Decision log document (append), then end with the final line `FACTORY: in review <PR numbers>`. Do not loop and
-  do not schedule a wakeup.
-- **Resumed sessions**: a prompt that starts with "Continue /factory-auto" or "<owner> answered on" means the tick
-  brought you back. Re-read the factory state comment and the ticket before acting.
+- **Work package**: several issue numbers mean one worker doing them in the given order, as **one change**: one design, one review-loop over the whole diff, one gate, one commit (push repo) or PR (PR repo) whose message carries `Fixes #<n>` for each issue. The planner groups only issues that belong together, so don't review, verify and push issue by issue. Split only where the repo's rules require it. In a PR repo, name extra branches `<branch_prefix><lead>-<slug>` so the tick finds them.
+- **Never use AskUserQuestion.** The stop reasons still apply; the way to stop is the protocol in `issues.md` §5: one `<!-- factory-question -->` comment, the `factory: needs info` label, `parked_at` in that issue's state comment, and the last line `FACTORY: parked on #<n>`. The tick notifies the owner and resumes you with their answer.
+- **The state comment** (`<!-- factory-state -->` on each issue) is the tick's. You update only `prs`, `parked_at` and `review` in its JSON (`gh api -X PATCH repos/<repo>/issues/comments/<id> -f body=...`), keeping the rest.
+- **Fix your own open work in place**: a gap in code this package added (a missing test, a weak assertion, a reviewer's nit) is a commit on the same branch, not a new issue.
+- **Follow-ups**: everything else you would list as a follow-up or deferral gets an issue first (`issues.md` §2 and §4), inside the same target when it is in scope (same batch parent or the target's labels), and the PR body or commit message links it. A follow-up that needs this package's unmerged code is "blocked by" this package's issue.
+- **Review numbers**: before the hand-off, write `"review": {"rounds": <review-loop rounds run>, "findings": <verified findings fixed or filed>, "opus_consults": <second opinions asked>}` into the **lead** issue's state comment, summed over every review-loop run in the package. The dashboard compares models with them.
+- **Hand-off**: end exactly as the tick's prompt says (`FACTORY: in review #…`, `FACTORY: shipped <shas>` or `FACTORY: parked on #…`). Do not loop and do not schedule a wakeup.
+- **Resumed sessions**: a prompt that starts with "Continue /factory-auto" or "<owner> answered on" means the tick brought you back. Re-read the state comments, the issue comments and the worktree's `git log` before acting.
 
-## Babysit pass
+## Final report (interactive runs only)
 
-`/factory-auto babysit <PR> [reviewers: <login> ...]`. One pass over the PR, or every open PR in its stack
-(`gh stack view --json` succeeds) bottom to top, then end. The tick calls it again when the PR's signals change,
-so never schedule a wakeup, never loop, never AskUserQuestion. Read the principles file first; its merge rules
-(section 7) are the source of truth, so read them on every pass instead of working from memory.
-
-1. **Signals.** `gh pr view <PR> --json state,mergeable,mergeStateStatus,headRefOid,baseRefName,reviewDecision,latestReviews,comments`,
-   `gh pr checks <PR>`, and the unresolved review threads (GraphQL `reviewThreads(last: 100)`; `first: 100` hides
-   new threads on big PRs). Merged or closed PRs drop out; all of them merged means go to step 6. A command that
-   errors (auth, network): say so in the final line and end. Never guess state.
-2. **Stack sync and conflicts.** A lower PR merged since last pass: `gh stack sync`. A conflict: rebase onto the
-   base, resolving each conflict in the lowest PR that touches the file. GitHub checks a stacked PR against the
-   branch the stack lands on, not its own base, so test with `git merge-tree --write-tree origin/<base> <head>`.
-   Never call the conflict flag stale. A conflict that needs a product call is a stop case.
-3. **Failed CI** (settled checks only). Read the failed log (`gh run view <id> --log-failed`). A flake that is
-   clearly not this branch: `gh run rerun <id> --failed`, once per commit. A real failure: reproduce with the
-   narrowest command and fix the root cause. The `babysit-pr` skill's failure-handling guidance applies; its
-   polling and its "never merge" end state do not.
-4. **Review threads and review bodies.** Valid: fix within the agreed design. False positive or already decided:
-   decline with the reason. A fix that changes how the feature works (who owns data, stored data or API contracts,
-   retry or quota rules) is a stop case, not a routine fix. After the design-freeze limit in the principles file,
-   handle only CI, conflicts and human comments.
-5. **Verify and push**, only if code changed: the repo's own lint, typecheck and tests for what you touched; push;
-   confirm `git rev-parse HEAD` equals `git rev-parse @{u}`. Then close the loop on each thread: fixed as asked,
-   resolve it; declined or fixed differently, reply with the reason, then resolve. Re-request review only from
-   reviewers who have not approved, and only when the PR's own diff changed.
-6. **Merge verdict.** Compute `auto` or `hold` per PR from the principles file, section 7. Post or update **one**
-   PR comment starting with `<!-- factory-merge-verdict -->`: `**Merge verdict: auto**` or `**Merge verdict: hold**`,
-   the reason on the same line, and the reviewers requested. Then act on it exactly as section 7 says (auto-merge
-   for a single PR, `gh stack merge` for the ready bottom of a stack, request reviewers for PRs without a human
-   approval: the `reviewers:` you were given first).
-7. **After the last PR of the package merges**: file any deferral still without a ticket, append one line per
-   decision to the project's Decision log, move the ticket to Done if the GitHub integration did not.
-
-Final line of every pass, so the tick log reads without opening the session: `FACTORY: in review <PRs>`,
-`FACTORY: blocked <why>`, `FACTORY: parked on <KEY>`, or `FACTORY: merged <PRs>`.
+List every commit or PR with its Decisions taken so the owner can overrule them in one pass.

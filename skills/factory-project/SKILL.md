@@ -1,58 +1,62 @@
 ---
 name: factory-project
-description: Project intake for the factory, done with the owner in one sitting. Turns "I want to build X" into the Linear project documents the workers read (UX spec, Architecture, Defaults, Decision log), a target scope rule, and a ticket tree in stack order, so that workers can run unattended without asking UX or architecture questions. Use for "/factory-project", "kick off this project for the factory", "spec this feature for the factory".
-argument-hint: <project or feature intent, or an existing Linear project / milestone>
+description: Project intake for the factory, done with the owner in one sitting, in any repo the factory knows. Turns "I want to build X" into a spec the workers read, a batch of GitHub issues in build order in the right repo, a scope rule and a factory target, so workers can run unattended without asking UX or architecture questions. Use for "/factory-project", "kick off this project for the factory", "spec this feature for the factory", "put this on the factory".
+argument-hint: <project or feature intent, or an existing batch issue>
 ---
 
 # factory-project
 
 This is the one place the human spends real time. The goal is that no worker later needs to ask what the product should do. Go back and forth with the owner here; this skill is interactive by design. Everything else in the factory is not.
 
-## 0. Frame and place it in Linear
+## 0. Frame it and pick the repo
 
-Read the principles file (`FACTORY_PRINCIPLES` env or `~/.claude/factory/principles/principles.md`), the repo's product docs for the area, and the Linear workspace: `list_projects` for related projects, their milestones, and any existing tickets or documents that touch this intent (search 3 to 4 title keywords). Restate the intent in five lines.
+Read `~/.claude/factory/factory.json` (the repos and their targets), `~/.claude/factory/issues.md`, `principles/common.md` and the repo's principles file. Decide which repo the work lives in from the intent and say so in one line; a repo not in `repos` is added with `/factory-run add repo` first.
 
-Then decide where it lives and say so in one sentence with a recommendation, e.g. "This is a new module inside Billing; I'd add a milestone 'Invoices export' there rather than a new project, because the tickets share that project's labels, docs and release plan." A separate project only when the work has its own lead, its own release plan, or spans several existing projects. The owner says yes or redirects; then **create it** (`save_milestone` or `save_project`) and move any existing related tickets into it. The owner never creates Linear containers by hand.
+In that repo, read `CLAUDE.md`, its decision log and the plan or product docs for the area (whatever the repo keeps), and the open issues that touch the intent (`gh issue list -R <repo> --state all --search "<3-4 words>"`, and existing `batch` parents). Restate the intent in five lines, naming the user job or decision it serves.
 
-Agree the **target** (that project or milestone) and a one-sentence **scope rule** ("what this target does not do"). Agree the rollout: flag name, who sees it, when it flips.
+Then decide where it lives and say so with a recommendation: a new batch parent issue, or new sub-issues under an existing batch. The owner says yes or redirects; then create it and move related existing issues under it as sub-issues. The owner never creates issues or labels by hand.
 
-## 1. UX spec (deep where rework is expensive, shallow where it is cheap)
+Agree the **target** (the batch parent, plus labels when needed) and a one-sentence **scope rule** ("what this target does not do"). Agree the rollout: flag, who sees it, when it flips.
 
-Produce the Linear document **"UX spec"** on the project with:
+## 1. Spec (deep where rework is expensive, shallow where it is cheap)
 
-- **Flows**: every user flow as numbered steps, entry points and exits, naming the existing equivalent flow where one exists ("same as X, except...").
-- **State-by-surface table**: rows are states (empty, loading, partial, error, limit reached, disconnected, paused...), columns are surfaces (list row, detail page, settings, notifications, public API...). Each cell says what the user sees and can do. This table alone removes a large share of the questions workers would otherwise ask.
-- **Glossary**: every metric, label, status word and count with its exact meaning and where it shows.
-- **Limits and errors table**: every provider limit and error class, what the user sees, what the system does (pause, retry, end cleanly).
-- **Copy principles** for the area, and only the copy that carries product meaning. Pixel-level layout is left to the worker and your visual tests.
-- **Out of scope** list, explicit.
+Write the spec into the batch parent's body (or a committed doc it links when the repo keeps specs in files; follow the repo's convention):
+
+- **Flows**: every user flow as numbered steps, entry points and exits.
+- **State-by-surface table**: rows are states (empty, loading, partial, error, permission denied, offline…), columns are surfaces (each page or component, email, API). Each cell says what the user sees and can do.
+- **Glossary**: every label, status word and number with its exact meaning and where it shows.
+- **Limits and errors**: every limit and error class, what the user sees, what the system does.
+- **Copy principles** for the area, and only the copy that carries product meaning. Pixel layout is left to the worker and the visual check.
+- **Out of scope**, explicit.
 
 Ask the owner only about forks that change what a user sees; recommend a default for each. Do not ask about internals.
 
-## 1b. Low-fidelity visuals (optional, when a design tool is connected)
+## 1b. Low-fidelity visuals in HTML (always, right after the spec)
 
-A text spec is not enough to see a flow. If the session has a design tool (for example the Figma MCP server), produce a flows board (one diagram per scenario, under ~25 nodes each, ending in the outcomes the user sees) and grayscale wireframes (one frame per screen in the state-by-surface table, plus one per state that changes the screen's shape, with real copy from the spec). Low fidelity only. Link them from the top of the UX spec, and add them to the target's `links` in `factory.json` so the dashboard shows them and workers find them. Walk the owner through them and fold corrections back into the UX spec first.
+A text spec is not enough to see a flow. Make two files in `~/.claude/factory/projects/<target name>/`, the folder every worker of the target reads. Low fidelity only: grayscale boxes and labels, system font, no design-system components, no pixel work; the workers and the repo's visual check handle the real UI later. Each file is self-contained (inline CSS and SVG, no external scripts, fonts or images) so it opens by double-click from `file://`.
+
+1. **`flows.html`**: one diagram per scenario, each under ~25 boxes, drawn as inline SVG or CSS boxes with arrows: (a) create and manage, from every entry point through each action; (b) what the system does on each run or event, as a decision tree ending in the outcomes the user sees; (c) one more per distinct flow in the spec that doesn't fit the first two. Green for the happy outcome, gray for skipped or hidden, amber for decisions, red for errors.
+2. **`wireframes.html`**: one grayscale frame per screen in the state-by-surface table, plus one per state that changes the screen's shape (empty, loading, error, offline, permission denied). Real copy from the spec (labels, buttons, empty-state text, banners), at the widths the repo cares about, with numbered notes between frames for the flow order. Also a frame for any existing screen the feature touches.
+3. Open both in a browser (Playwright), screenshot each to `~/.claude/factory/projects/<target>/shots/`, and fix only what is unreadable. If your client only shows images from inside the current workspace, copy the screenshots there and embed those copies.
+4. **Link them**: a "Visuals" section at the top of the batch parent's body with the two paths (they live on the owner's machine, like the issue flow), and `"design": "~/.claude/factory/projects/<target>"` on the target in `factory.json` so the tick hands the folder to every worker.
+5. Walk the owner through them in one message with the screenshots inline: what each flow shows, what you had to invent, which frames to look at. Fold their corrections into the spec first, then the HTML.
 
 ## 2. Architecture
 
-Before any architecture, write the **end-state story** at the top of the Architecture document and get the owner's yes on it: in ten plain lines, how the feature works in production when it is finished, what gets written where, what the user sees on each screen, and how it migrates into whatever replaces it. Every provider limit or numeric default that shapes the product (check interval, page size, caps, retention) goes in a **Defaults and limits** table with the trade-off and the alternative, never silently in the body. Defaults inherited from a prototype without being surfaced are the ones the owner later finds by reading the document.
+First an **end-state story** at the top: in ten plain lines, how it works in production, what gets written where, what the user sees. Every limit or numeric default that shapes the product goes in a **Defaults and limits** table with the trade-off and the alternative, never silently in the body.
 
-Then produce the Linear document **"Architecture"**: data model (tables, columns, the stable ids), the one shared path every surface goes through, events and queues, flags, migration and backfill order, external dependencies, what is explicitly reused, and the invariants (tenancy scoping, idempotency, ordering). Run `/design` on it if it introduces a new subsystem, table, or data flow; the critique panel is cheap compared with ten workers building on a wrong shape. **If the owner changes the shape materially after the critique, run one more critique round on the revised design before writing tickets**; a design that was critiqued and then rewritten is uncritiqued. Record alternatives dropped.
+Then the architecture: data model, the one shared path every surface goes through, events, flags, migration order, what is reused, the invariants the repo's `CLAUDE.md` names. Run the repo's `/design` on it if it introduces a new subsystem, table or data flow. If the owner changes the shape materially after the critique, critique the revised design once more before writing issues.
 
-Questions to the owner use product words only. Never name internal parts you invented in a question; say what the user or the system does. When a question depends on how a provider behaves, state that behavior in one sentence first.
+Questions to the owner use product words only, never names of internal parts you invented.
 
-## 3. Defaults
+## 3. Defaults and decisions
 
-Produce the Linear document **"Defaults"**: a when-in-doubt table for this target (naming, placement, test strategy, flag use, error handling, telemetry), plus the "Decisions already made" list that workers must not reopen.
+Add a **Defaults** section: a when-in-doubt table for this target (naming, placement, test strategy, flag use, error handling, telemetry) and the decisions workers must not reopen. Decisions the owner explicitly made in this sitting go into the repo's decision log when it keeps one (record as their choice only what they chose; name your proposals as proposals). Workers record their own choices as `<!-- factory-note -->` comments on the batch parent.
 
-## 4. Decision log
+## 4. Issues
 
-Create the Linear document **"Decision log"** with the header and the first entries (the decisions taken in steps 1 to 3). Workers append one line per decision (`date · ticket · PR · decision · alternative · why`).
+Create the sub-issues per `issues.md` §2 and §3: thin vertical slices, each one worker's job (one PR, or a few commits in a push repo), kept on the small side: when a piece is big (a whole component with many states), split it into several slices along its seams rather than one long session. Smaller PRs and shorter agent sessions are almost always better. Each slice gets `## Verify` lines and the three labels, "blocked by" relations in build order, and is attached to the batch parent. The base slice first ("barebone end to end behind the flag"), then the slices that make it real, then polish. Never create an issue for work the scope rule excludes; list those under "Later" in the spec. Leave them without `factory:` labels so triage looks at each, or add `factory: ready` to the ones you and the owner already agreed are clear.
 
-## 5. Ticket tree
+## 5. Hand over and start
 
-Create or update tickets with `save_issue`: thin vertical slices, one PR stack of at most 3 PRs each, each with `## Verify` yes/no lines, `blocks`/`blocked by` relations in build order, priority set, in the agreed project and milestone, status **Backlog** (the factory's triage moves them to Todo). Name the base slice first ("barebone end to end behind the flag"), then the slices that make it real, then polish. Never create a ticket for work the scope rule excludes; list those under "Later" in the UX spec instead.
-
-## 6. Hand over and start
-
-Add or update the target in `~/.claude/factory/factory.json` (`name`, `project`, `milestone`, `scope_rule`, `max_in_flight`, default 3 for a new module, `reviewers`, `links`). Summarize to the owner: the documents, the ticket count by slice, the scope rule, and the open forks they still owe an answer on (there should be none). Then ask one question: "Start the factory on this target now?" On yes, run the `factory-run` skill with `start` (it installs the tick and dashboard if needed and runs the first pass) and show the dashboard link and the first tick's result.
+Add the target to `~/.claude/factory/factory.json` (`name`, `repo`, `batch`, `labels` if any, `scope_rule`, `design`, `max_in_flight`, default 2; PR repos also `max_awaiting_review`), paused. Summarize to the owner: the spec, the issue count by slice, the scope rule, and any open fork they still owe an answer on (there should be none). Then ask one question: "Start the factory on this target now?" On yes, unpause it and run `factory-run start` (it installs the tick and dashboard if needed and runs the first pass), and show the dashboard link and the first tick's result.
