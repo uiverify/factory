@@ -95,6 +95,11 @@ dependencies per your conventions doc's test rules. As you implement, run the lo
 incrementally so you don't pile up breakage: your local gate (format, lint, typecheck,
 test), stopping on the first failure you caused.
 
+**Changing UI with UI Verify set up?** If the repo runs UI Verify and its skills are
+installed (`npx skills add uiverify/uiverify`), read its `making-ui-changes` skill before
+you touch a component, page or style, and follow it: pick up open review notes on the
+branch, reuse before you create, cover every state, check the blast radius.
+
 Before handing off to review, run the **completeness sweep** from
 [the reviewer brief](../review-multi-model/references/reviewer-brief.md) yourself: list
 every UI state you added or changed and give each a story (or visual test), give every
@@ -147,18 +152,25 @@ not a gamble. If e2e-verify runs and surfaces a real problem, fix it here.
 Say why you skipped when you skip - "no runtime/UI surface, covered by unit tests" - so
 the decision is visible.
 
+**Check the visual impact before the PR (UI Verify).** If the diff touches UI and the repo runs
+UI Verify, run its `check-visual-changes` skill (`uiverify check`) on the final diff: it renders
+only the stories and pages you touched and compares them with the CI baseline, without opening a
+PR or moving a baseline. Triage what it reports with `triage-visual-changes`: fix every
+regression here, so the PR opens with only the visual changes you meant. A fix made here is a
+code change, so Phase 7 re-reviews it. Skip this when the diff has no UI surface, and say so.
+
 ## Phase 7 - Re-review after E2E fixes
 
-If Phase 6 produced **any** code change, run [`review-loop`](../review-loop/SKILL.md)
-again - a fix can introduce a new defect, and this loop's whole premise is that only a
+If Phase 6 (e2e-verify or the visual check) produced **any** code change, run
+[`review-loop`](../review-loop/SKILL.md) again - a fix can introduce a new defect, and this loop's whole premise is that only a
 clean *re*-review certifies the diff. If Phase 6 ran nothing or changed nothing, skip.
 
 ## Phase 8 - Raise the PR and drive it green
 
 Hand off to [`/babysit-pr`](../babysit-pr/SKILL.md): commit, push, open the PR, and
 babysit CI - polling ~every 10 min, reacting to each failure (lint/type/test/e2e and, if
-you run a visual check, its diffs - triaged through your visual tool's MCP if it has one,
-e.g. UI Verify). `/babysit-pr` does not merge.
+you run a visual check, its diffs - for UI Verify, triaged with the `triage-visual-changes`
+skill, never by hand-rolled MCP calls). `/babysit-pr` does not merge.
 
 ## Phase 9 - Converge
 

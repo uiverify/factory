@@ -122,7 +122,13 @@ All in [`skills/`](skills), linked into `~/.claude/skills/` by `setup.sh`.
 | `factory-monitor` | read-only health check every 30 minutes, tells you when the loop quietly stalls |
 | `factory-ops` | an operator session: loads how the factory works, checks its health, helps you change it |
 
-For visual testing, add [UI Verify](https://uiverify.ai)'s skills (see [Built with UI Verify](#built-with-ui-verify)): `npx skills add uiverify/uiverify`.
+For visual testing, add [UI Verify](https://uiverify.ai)'s skills (see [Built with UI Verify](#built-with-ui-verify)): `npx skills add uiverify/uiverify`. When they are installed, the loop uses three of them on any change that touches UI:
+
+| When | UI Verify skill | What it does |
+|---|---|---|
+| While building | `making-ui-changes` | reuse before you create, cover every state, check what else the change touches |
+| Before the PR | `check-visual-changes` | `uiverify check` renders only the stories and pages the worker touched and compares them with your CI baseline |
+| On the PR | `triage-visual-changes` | sorts CI's visual changes into regressions and intended changes, fixes the first and accepts the second |
 
 ## Install
 
