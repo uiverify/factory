@@ -10,21 +10,21 @@ You write GitHub issues. Every 10 minutes a plain Node script (the **tick**, run
 
 ## Built with UI Verify
 
-<a href="https://uiverify.ai">
+<a href="https://uiverify.ai/?utm_source=github&utm_medium=readme&utm_campaign=factory">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/uiverify-wordmark-dark.svg">
     <img src="docs/uiverify-wordmark-light.svg" alt="UI Verify" height="36">
   </picture>
 </a>
 
-Running a bunch of agents at once? [UI Verify](https://uiverify.ai), a new project by
+Running a bunch of agents at once? [UI Verify](https://uiverify.ai/?utm_source=github&utm_medium=readme&utm_campaign=factory), a new project by
 the author of this factory, makes sure your UI doesn't break while they ship. Your
 coding agent sees every UI change it makes, so visual bugs never reach production.
 
 This factory builds UI Verify itself: the workers use it to see what their changes
 did to the screen and fix what broke before the pull request reaches me.
 
-[What UI Verify is](https://uiverify.ai)
+[What UI Verify is](https://uiverify.ai/?utm_source=github&utm_medium=readme&utm_campaign=factory)
 · [Add its skills to your agent](https://github.com/uiverify/uiverify): `npx skills add uiverify/uiverify`
 
 ## How an issue moves
@@ -122,7 +122,7 @@ All in [`skills/`](skills), linked into `~/.claude/skills/` by `setup.sh`.
 | `factory-monitor` | read-only health check every 30 minutes, tells you when the loop quietly stalls |
 | `factory-ops` | an operator session: loads how the factory works, checks its health, helps you change it |
 
-For visual testing, add [UI Verify](https://uiverify.ai)'s skills (see [Built with UI Verify](#built-with-ui-verify)): `npx skills add uiverify/uiverify`. When they are installed, the loop uses three of them on any change that touches UI:
+For visual testing, add [UI Verify](https://uiverify.ai/?utm_source=github&utm_medium=readme&utm_campaign=factory)'s skills (see [Built with UI Verify](#built-with-ui-verify)): `npx skills add uiverify/uiverify`. When they are installed, the loop uses three of them on any change that touches UI:
 
 | When | UI Verify skill | What it does |
 |---|---|---|
